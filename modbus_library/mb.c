@@ -263,11 +263,14 @@ uint16_t crc16;
   if (rxState == RX_STATE_IDLE) {
     pSndFrameCur = mbBuffer;
     sndFrameCount = MB_ADDR_LENGTH + pduLength;
-    crc16 = getCrc16(pSndFrameCur, sndFrameCount);
-    *(pSndFrameCur + sndFrameCount++) = (uint8_t)(crc16 & 0xFF);
-    *(pSndFrameCur + sndFrameCount++) = (uint8_t)(crc16 >> 8);
-    txState = TX_STATE_TMIT;
-    UART_enable(false, true);
+    if (sndFrameCount <= MB_SIZE_MAX) {
+      crc16 = getCrc16(pSndFrameCur, sndFrameCount);
+      *(pSndFrameCur + sndFrameCount++) = (uint8_t)(crc16 & 0xFF);
+      *(pSndFrameCur + sndFrameCount++) = (uint8_t)(crc16 >> 8);
+      txState = TX_STATE_TMIT;
+      UART_enable(false, true);
+    }
+    else error = MB_ERROR_ILLVAL;
   }
   else {
     error = MB_ERROR_IOFAIL;
