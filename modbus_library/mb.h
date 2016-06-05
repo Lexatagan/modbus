@@ -1,6 +1,10 @@
 #ifndef MB_H_INCLUDED
 #define MB_H_INCLUDED
 
+
+#define MODBUS_BIG_BAUDRATE         19200         //Fixed intervals used on big baud rates
+#define TCHAR                       500           //us char length, used in calculations at big baud rates
+
 #define MB_ADDR_BROADCAST           0             //ModBus broadcast address
 #define MB_ADDR_MIN                 1             //ModBus slave min address
 #define MB_ADDR_MAX                 247           //ModBus slave max address

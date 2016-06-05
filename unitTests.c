@@ -22,10 +22,6 @@ extern uint16_t sndFrameCount;
 extern __IO uint32_t uartReg[];
 extern __IO uint32_t timerReg[2];
 extern uint8_t mbBuffer[];
-extern uint16_t t15;
-extern uint16_t t35;
-extern uint16_t t15Cnt;
-extern uint16_t t35Cnt;
 extern uint16_t memCard[];
 
 MB_ErrorTypeDef receiveFrame(uint8_t *pSlaveAddr, uint8_t **frame, uint16_t *pFrameLength);
@@ -34,7 +30,7 @@ void MB_t35Expired_cb();                                                        
 void MB_byte_received_cb(uint8_t chr);                                                          //byte received callback
 void MB_byte_sent_cb();                                                                         //byte sent callback
 
-void emulateDelay(uint16_t delay);
+void emulateTimerElapsed(void);
 uint16_t compareBuffer(char *data, uint16_t length);
 void fillBuffer(char *data, uint16_t length);
 void emulateFrameReceive(char *data, uint16_t length);
@@ -108,7 +104,6 @@ uint16_t framesize;
   rxState = RX_STATE_INIT;
   MB_byte_received_cb(0x00);                                  //Try receiving byte during rx in INIT
   assert((TIMER->TCSR & TIMER_TCSR_TEN) == TIMER_TCSR_TEN);
-  assert(t35Cnt == t35);
 
   rxState = RX_STATE_T35EXPECTED;
   MB_byte_received_cb(0x00);
@@ -116,7 +111,6 @@ uint16_t framesize;
 
   rxState = RX_STATE_IDLE;
   MB_byte_received_cb(0x10);                                  //Receiving byte during rx in IDLE
-  assert(t35Cnt == t35);
   assert(mbBufferPosition == 1);
   assert(rxState == RX_STATE_RCV);
   assert(mbBuffer[0] == 0x10);
@@ -281,17 +275,17 @@ uint16_t framesize;
   //Complex examine
   MB_stop();                                                  //Restart ModBus
   MB_start();
-  emulateDelay(t35);
+  emulateTimerElapsed();
   assert(mbEvent == MB_EVENT_READY);
   MB_poll();
   emulateFrameReceive("\x30\x03\x00\x31\x00\x02\x00\x00", 8);
   assert(compareBuffer("\x30\x03\x00\x31\x00\x02\x00\x00", 8) == 0);
   assert(rxState == RX_STATE_RCV);
   assert(mbEvent == MB_EVENT_NONE);
-  emulateDelay(t15);
+  emulateTimerElapsed();
   assert(rxState == RX_STATE_T35EXPECTED);
   assert(mbEvent == MB_EVENT_NONE);
-  emulateDelay(t35 - t15);
+  emulateTimerElapsed();
   assert(rxState == RX_STATE_IDLE);
   assert(mbEvent == MB_EVENT_FRAME_RECEIVED);
   assert(txState == TX_STATE_IDLE);
@@ -303,12 +297,9 @@ uint16_t framesize;
   assert(txState == TX_STATE_IDLE);
 }
 
-void emulateDelay(uint16_t delay)
+void emulateTimerElapsed(void)
 {
-uint8_t i;
-  for (i = 0; i < delay; i++) {
-    Timer_vect();
-  }
+  Timer_vect();
 }
 
 uint16_t compareBuffer(char *data, uint16_t length)               //Returns 0, if rxBuffer and *data are equal

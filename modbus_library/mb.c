@@ -8,7 +8,6 @@
 #include "crc.h"
 #include <assert.h>
 
-Timer_HandleTypeDef tmr;
 Uart_HandleTypeDef uart;
 
 uint16_t mbBufferPosition;
@@ -20,6 +19,7 @@ MB_RcvStateTypeDef rxState;
 MB_EventTypeDef mbEvent;
 uint8_t *pSndFrameCur;
 uint16_t sndFrameCount;
+uint16_t tChar;
 
 MB_ErrorTypeDef receiveFrame(uint8_t *pSlaveAddr, uint8_t **ppPdu, uint16_t *pPduLength);       //Calculate destination address,
                                                                                                 //PDU start, PDU length
@@ -45,11 +45,14 @@ MB_ErrorTypeDef error = MB_ERROR_OK;
     uartInit(&uart);
     printf("UART initialized at %u bod\n", (unsigned int)uart.baudRate);
 
-    tmr.baudRate = uart.baudRate;
-    tmr.cpuFrequency = cpuFrequency;
-    tmr.t15_cb = MB_t15Expired_cb;
-    tmr.t35_cb = MB_t35Expired_cb;
-    timerInit(&tmr);
+    if (cpuFrequency > MODBUS_BIG_BAUDRATE)                                                     //For baud rates more than 19200 fixed intervals used (1750us, 750us)
+    {
+      tChar = TCHAR;
+    }
+    else                                                                                        //else calculate these intervals
+    {
+      tChar = (uint16_t)(11 * cpuFrequency / baudRate);                                         //1 char (11bit per char)
+    }
 
     mbState = MB_STATE_DISABLED;
     rxState = RX_STATE_IDLE;
@@ -66,7 +69,7 @@ MB_ErrorTypeDef error = MB_ERROR_OK;
     mbEvent = MB_EVENT_NONE;
     rxState = RX_STATE_INIT;
     txState = TX_STATE_IDLE;
-    timerStartT35();
+    timerStart((uint16_t)(7 * tChar / 2), MB_t35Expired_cb);
     UART_enable(true, false);
     error = MB_ERROR_OK;
   }
@@ -100,13 +103,13 @@ void MB_byte_received_cb(uint8_t chr)
   }
   switch(rxState) {
     case RX_STATE_INIT :                                        //Wait 3.5 chars, required for ModBus initialization
-      timerStartT35();
+      timerStart((uint16_t)(7 * tChar / 2), MB_t35Expired_cb);
       break;
     case RX_STATE_IDLE :                                        //First byte of Serial PDU received
       mbBufferPosition = 0;
       mbBuffer[mbBufferPosition++] = chr;
       rxState = RX_STATE_RCV;
-      timerStartT35();
+      timerStart((uint16_t)(3 * tChar / 2), MB_t15Expired_cb);
       break;
     case RX_STATE_RCV :                                         //Next byte of Serial PDU received
       if (mbBufferPosition < MB_SIZE_MAX + 1) {
@@ -116,7 +119,7 @@ void MB_byte_received_cb(uint8_t chr)
         mbEvent = MB_EVENT_ERROR;
         rxState = RX_STATE_INIT;
       }
-      timerStartT35();
+      timerStart((uint16_t)(3 * tChar / 2), MB_t15Expired_cb);
       break;
     case RX_STATE_T35EXPECTED :                                 //t15 interval passed from last byte, but t35 not
       mbEvent = MB_EVENT_ERROR;
@@ -151,7 +154,7 @@ void MB_t15Expired_cb()
 {
   if (rxState == RX_STATE_RCV)
     rxState = RX_STATE_T35EXPECTED;
-
+  timerStart((uint16_t)(2 * tChar), MB_t35Expired_cb);          //2 char periods to t35
 }
 
 void MB_t35Expired_cb()

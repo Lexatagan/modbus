@@ -1,5 +1,5 @@
-#ifndef TIMERDRIVER_H_INCLUDED
-#define TIMERDRIVER_H_INCLUDED
+#ifndef UARTDRIVER_H_INCLUDED
+#define UARTDRIVER_H_INCLUDED
 
 #define UART              ((UART_TypeDef *)UART_BASE)
 #define UART_UCSR_RXEN    0x01
@@ -27,4 +27,4 @@ void UART_putByte(uint8_t data);                                //Send byte
 void UART_RXC_vect();                                           //UART Rx vector
 void UART_TXC_vect();                                           //UART Tx vector
 
-#endif // TIMERDRIVER_H_INCLUDED
+#endif // UARTDRIVER_H_INCLUDED
